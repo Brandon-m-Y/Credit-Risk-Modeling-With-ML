@@ -1,403 +1,326 @@
-## Credit Risk Modeling with Machine Learning
+# 💰 Credit Risk Modeling Pipeline
 
-This project builds and serves a **credit risk prediction model** on the classic German Credit dataset. It includes:
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.x-orange?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
+[![XGBoost](https://img.shields.io/badge/XGBoost-2.x-red?logo=xgboost&logoColor=white)](https://xgboost.readthedocs.io/)
+[![pandas](https://img.shields.io/badge/pandas-2.x-150458?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-- **Exploratory Data Analysis (EDA)** and model development in a Jupyter notebook.
-- A trained **XGBoost (or similar) classification model** saved to disk.
-- A **Streamlit web app** (`app.py`) that lets users enter applicant information and instantly predict whether the credit risk is **Good (1)** or **Bad (0)**.
-
-The goal is to demonstrate an end‑to‑end applied ML workflow for credit risk scoring: from raw CSV data to an interactive prediction tool.
-
----
-
-### Project Structure
-
-- **`german_credit_data.csv`**: Source dataset used for EDA and modeling.
-- **`EDA and Modeling.ipynb`**: Notebook for data exploration, feature engineering, model training, and evaluation.
-- **`app.py`**: Streamlit app that loads the trained model and encoders, collects user inputs, and outputs a credit risk prediction.
-- **`xgb_credit_model.pkl`**: Trained credit risk model (loaded by `app.py`, expected to be in the project root).
-- **`Sex_encoder.pkl` / `Housing_encoder.pkl` / `Saving accounts_encoder.pkl` / `Checking account_encoder.pkl`**: Label encoders for categorical features (expected to be in the project root and loaded by `app.py` via `joblib`).
-
-> **Note**: If the model or encoder files are not present, you will need to (re)run the notebook to train the model and save these artifacts (see below).
+> End-to-end credit risk modeling pipeline using Python to predict loan default probability on Kaggle's German Credit Risk dataset — from raw data to a live Streamlit prediction app.
 
 ---
 
-### Data Description
+## Table of Contents
 
-The project uses the **German Credit Data** dataset, a tabular dataset commonly used for credit risk modeling. Each row represents a loan applicant and includes:
-
-- **Demographic and financial features** such as:
-  - `Age`
-  - `Sex` (e.g. `male`, `female`)
-  - `Job` (integer code, 0–3)
-  - `Housing` (e.g. `own`, `rent`, `free`)
-  - `Saving accounts` (e.g. `little`, `moderate`, `rich`, `quite rich`)
-  - `Checking account` (e.g. `little`, `moderate`, `rich`)
-  - `Credit amount`
-  - `Duration` (months)
-- **Target / label**: a binary indicator of **credit risk**:
-  - `1` = **Good** (lower risk)
-  - `0` = **Bad** (higher risk)
-
-Exact feature cleaning, encoding, and transformations are detailed in the notebook.
+1. [Project Overview](#1-project-overview)
+2. [End-to-End Analysis & Modeling Process](#2-end-to-end-analysis--modeling-process)
+   - [2.1 Business Understanding & Problem Definition](#21-business-understanding--problem-definition)
+   - [2.2 Data Acquisition & Initial Inspection](#22-data-acquisition--initial-inspection)
+   - [2.3 Exploratory Data Analysis](#23-exploratory-data-analysis)
+   - [2.4 Data Preprocessing & Feature Engineering](#24-data-preprocessing--feature-engineering)
+   - [2.5 Multi-Model Training & Hyperparameter Tuning](#25-multi-model-training--hyperparameter-tuning)
+   - [2.6 Model Evaluation & Comparison](#26-model-evaluation--comparison)
+   - [2.7 Deployment — Streamlit Prediction App](#27-deployment--streamlit-prediction-app)
+3. [Repository Structure](#3-repository-structure)
+4. [Quick Start](#4-quick-start)
+5. [Reproducibility & Extensions](#5-reproducibility--extensions)
+6. [License & Acknowledgements](#6-license--acknowledgements)
 
 ---
 
-### Environment & Requirements
+## 1. Project Overview
 
-You can manage dependencies via `pip` in a virtual environment. A typical environment will need:
+Credit default is one of the most costly risks a lending institution faces. When a borrower fails to repay, lenders absorb not only the outstanding principal but also the operational costs of collections, regulatory capital charges, and reputational damage. Accurately identifying high-risk applicants before a loan is issued is therefore a core function of any modern credit underwriting operation.
 
-- **Python** 3.8+ (3.9 or 3.10 recommended)
-- **Core scientific stack**:
-  - `pandas`
-  - `numpy`
-  - `matplotlib`
-  - `seaborn`
-- **Modeling**:
-  - `scikit-learn`
-  - `xgboost` (or another gradient boosting library used in the notebook)
-  - `joblib`
-- **App**:
-  - `streamlit`
+This project builds a production-oriented credit risk scoring pipeline on the **German Credit Risk dataset** (available on Kaggle). It replicates the full analytical workflow a data science team at a bank or fintech would follow: ingesting raw applicant data, performing rigorous exploratory analysis, engineering features, benchmarking multiple classification algorithms with cross-validated hyperparameter search, and surfacing the winning model through an interactive web interface.
 
-Example installation (from the project root):
+The primary objective is to classify each applicant as **Good** (low default risk) or **Bad** (high default risk) using demographic and financial attributes, while explicitly accounting for class imbalance — a structural reality in any credit portfolio where defaults are less frequent than repayments.
+
+**Target audience:** Lending institutions, fintech credit teams, community banks, and analytics consultants evaluating ML-driven underwriting tools.
+
+---
+
+## 2. End-to-End Analysis & Modeling Process
+
+### 2.1 Business Understanding & Problem Definition
+
+| Dimension | Detail |
+|---|---|
+| **Business Problem** | Predict loan default probability to reduce credit losses and improve underwriting decisions |
+| **ML Task** | Binary classification (Good Risk = 1 / Bad Risk = 0) |
+| **Dataset** | German Credit Risk — 1,000 applicants, 10 features + 1 target |
+| **Success Metric** | Accuracy on held-out test set; class-balanced model selection |
+| **Deployment Target** | Real-time scoring via Streamlit web application |
+
+Credit decisions are asymmetric: approving a bad borrower (false negative) typically costs far more than rejecting a good one (false positive). The pipeline therefore uses **class-balanced training** (`class_weight='balanced'`, `scale_pos_weight`) throughout to prevent models from naively predicting the majority class.
+
+---
+
+### 2.2 Data Acquisition & Initial Inspection
+
+The raw dataset contains **1,000 rows** across 10 features and a binary target (`Risk: good/bad`). Initial inspection revealed:
+
+- **No duplicate rows** in the dataset.
+- **Two features with missing values**: `Saving accounts` (183 nulls, 18.3%) and `Checking account` (394 nulls, 39.4%).
+- **Significant class imbalance** in the full dataset: 70% Good / 30% Bad.
+- After dropping rows with any missing account information, the working dataset is **522 records** with a near-balanced split of 55.7% Good / 44.3% Bad.
+
+```
+Original dataset:  1,000 rows × 11 columns
+After null removal:  522 rows × 10 columns
+Train set:  417 samples (80%)
+Test set:    105 samples (20%) — stratified split
+```
+
+**Key feature summary:**
+
+| Feature | Type | Notes |
+|---|---|---|
+| `Age` | Numeric | 19–75, mean 35.5 |
+| `Sex` | Categorical | 69% male |
+| `Job` | Ordinal (0–3) | Skill level; higher = more skilled |
+| `Housing` | Categorical | own / free / rent |
+| `Saving accounts` | Ordinal | little / moderate / rich / quite rich |
+| `Checking account` | Ordinal | little / moderate / rich |
+| `Credit amount` | Numeric | €250–€18,424, mean €3,271 |
+| `Duration` | Numeric | 4–72 months, mean 20.9 |
+| `Purpose` | Categorical | 8 loan purposes (car, education, etc.) |
+| `Risk` | **Target** | good (1) / bad (0) |
+
+---
+
+### 2.3 Exploratory Data Analysis
+
+EDA was conducted across three axes: **univariate distributions**, **bivariate relationships with the target**, and **cross-feature correlations**. Key findings are embedded below.
+
+---
+
+#### Target Distribution
+
+![Risk Class Distribution — Near-balanced after null removal (55.7% Good / 44.3% Bad), confirming class imbalance handling is still warranted](images/Risk%20distributions.png)
+
+After removing records with missing account data, the class distribution converges toward balance. This reflects a selection effect: applicants with complete financial disclosures (both savings and checking account data) tend to cluster in a narrower risk profile, unlike the raw population which skews 70/30 toward Good.
+
+---
+
+#### Numerical Feature Distributions
+
+![Distributions of Age, Credit Amount, and Duration — Credit amount and duration show right skew indicating the presence of high-value, long-tenor outlier loans](images/general%20feature%20distributions.png)
+
+- **Age** is approximately normally distributed with a mean of 35.5 years.
+- **Credit amount** is strongly right-skewed: most loans cluster below €5,000, but a long tail of high-value loans (up to €18,424) can disproportionately impact model learning.
+- **Duration** mirrors the credit amount skew, with most loans between 12–36 months but a tail extending to 72 months.
+
+---
+
+#### Credit Amount by Risk Category
+
+![Credit Amount Distributions by Risk Label — Bad-risk borrowers carry materially higher average loan balances (~€3,881) than good-risk borrowers (~€2,801)](images/Credit%20amount%20distributions.png)
+
+This is one of the clearest predictive signals in the dataset. Bad-risk applicants carry an average loan balance **38.6% higher** than good-risk applicants (€3,881 vs €2,801), and a median loan duration of **25.4 months** vs **18.1 months** for good-risk applicants. Higher exposure at default combined with longer tenor is a textbook indicator of elevated credit risk.
+
+---
+
+#### Categorical Variables by Risk Level
+
+![Categorical Features Split by Risk Label — Checking account and saving account status are the strongest categorical discriminators between good and bad risk](images/variables%20by%20risk%20level.png)
+
+Account health is highly predictive. Applicants with `little` checking account balances are disproportionately concentrated in the bad-risk class, while those with `rich` or `quite rich` savings accounts skew heavily toward good-risk. This aligns with the financial intuition that liquidity buffers reduce default probability. The `Job` skill level also shows a positive relationship with creditworthiness — higher-skilled workers (Job = 3) default at lower rates.
+
+---
+
+#### Feature Correlation Heatmap
+
+![Correlation Heatmap — Credit amount and duration show the strongest inter-feature correlation (r = 0.61), suggesting larger loans structurally require longer repayment windows](images/Heatamp%20for%20correlation.png)
+
+The correlation matrix reveals a **strong positive relationship between credit amount and duration (r = 0.61)** — larger loans are naturally associated with longer repayment terms. `Job` shows moderate correlation with both duration (r = 0.20) and credit amount (r = 0.33), indicating that higher-skilled workers tend to take larger, longer-tenor loans. Age is uncorrelated with duration (r ≈ 0.00), suggesting that loan structure is not age-driven in this dataset.
+
+---
+
+#### Credit Amount vs. Age (by Sex and Duration)
+
+![Scatter Plot of Credit Amount vs Age, colored by Sex, sized by Duration — No clear age-driven pattern, but larger high-risk loans (larger bubbles) appear across all age groups](images/Credit%20vs%20Age.png)
+
+This multidimensional view confirms that **large, long-duration loans are distributed across all age groups** rather than concentrated in younger or older applicants. The largest loans (bubble size = duration) appear in the 25–50 age range regardless of sex. Mean credit amount is slightly higher for male applicants (€3,441 vs €2,937 for female), though sex alone is a weak predictor compared to account-level features.
+
+---
+
+### 2.4 Data Preprocessing & Feature Engineering
+
+The preprocessing pipeline was kept intentionally lean to avoid data leakage and reflect a realistic production-deployment scenario:
+
+**Missing Value Treatment**
+- Rows with nulls in `Saving accounts` or `Checking account` were dropped (listwise deletion). Imputation was evaluated but rejected — these fields are strong predictors; imputing them risks injecting noise into the most informative features.
+
+**Categorical Encoding**
+- `Sex`, `Housing`, `Saving accounts`, and `Checking account` were encoded using **LabelEncoder** and persisted to `.pkl` files for consistent inference in the Streamlit app.
+- `Purpose` was excluded from the final feature set after EDA showed weak direct association with the target relative to account-health features.
+- **Design note:** LabelEncoder is appropriate here for ordinal-like features (account balance tiers); OHE was considered for nominal features but omitted to keep feature space compact given the 522-sample dataset.
+
+**Train / Test Split**
+- 80/20 stratified split (`random_state=42`) to preserve class proportions in both sets: 417 training samples, 105 test samples.
+
+**Class Imbalance Handling**
+- All tree-based models trained with `class_weight='balanced'`.
+- XGBoost used `scale_pos_weight = n_negative / n_positive` (≈0.79 on training data) to up-weight the minority bad-risk class.
+
+**Final feature set (8 features):** `Age`, `Sex`, `Job`, `Housing`, `Saving accounts`, `Checking account`, `Credit amount`, `Duration`
+
+---
+
+### 2.5 Multi-Model Training & Hyperparameter Tuning
+
+Four classifiers were benchmarked using a unified `GridSearchCV` helper (5-fold cross-validation, `scoring='accuracy'`, `n_jobs=-1`):
+
+```python
+def train_model(model, param_grid, X_train, y_train, X_test, y_test):
+    grid = GridSearchCV(model, param_grid, cv=5, scoring='accuracy', n_jobs=-1)
+    grid.fit(X_train, y_train)
+    best_model = grid.best_estimator_
+    y_pred = best_model.predict(X_test)
+    return best_model, accuracy_score(y_test, y_pred), grid.best_params_
+```
+
+**Decision Tree** — Searched over `max_depth` [3, 5, 7, 10, 12, None], `min_samples_split` [2, 5, 10, 12], `min_samples_leaf` [1, 2, 4, 6].
+
+**Random Forest** — Additionally searched `n_estimators` [100, 200].
+
+**Extra Trees** — Same grid as Random Forest.
+
+**XGBoost** — Searched `n_estimators` [100, 200], `max_depth` [3, 5, 7, 10, 12, 15], `learning_rate` [0.01, 0.1, 0.2, 0.3], `subsample` [0.7, 1.0], `colsample_bytree` [0.7, 1.0].
+
+---
+
+### 2.6 Model Evaluation & Comparison
+
+| Model | Test Accuracy | Best Parameters |
+|---|---|---|
+| Decision Tree | 60.0% | `max_depth=7`, `min_samples_leaf=2`, `min_samples_split=12` |
+| Extra Trees | 62.9% | `max_depth=None`, `min_samples_leaf=1`, `min_samples_split=10`, `n_estimators=100` |
+| Random Forest | 64.8% | `max_depth=10`, `min_samples_leaf=2`, `min_samples_split=12`, `n_estimators=100` |
+| **XGBoost** | **66.7%** | `colsample_bytree=0.7`, `learning_rate=0.3`, `max_depth=3`, `n_estimators=200`, `subsample=0.7` |
+
+**XGBoost emerged as the best-performing model** at 66.7% test accuracy, outperforming Random Forest by ~1.9 percentage points and the Decision Tree baseline by ~6.7 points.
+
+The XGBoost configuration reflects sound credit risk modeling practice:
+- **Shallow trees (`max_depth=3`)** reduce overfitting on this relatively small dataset while preserving interpretability.
+- **Aggressive subsampling (`subsample=0.7`, `colsample_bytree=0.7`)** provides regularization through stochastic gradient boosting.
+- **High learning rate (`0.3`) + more trees (`200`)** compensates with faster, deeper ensemble learning.
+
+**Business interpretation:** On a 105-applicant test set, XGBoost correctly classified ~70 applicants. In a real portfolio, even a 5% lift in bad-loan detection rate translates directly to reduced expected credit losses — particularly valuable when the average bad loan balance in this dataset is €3,881.
+
+---
+
+### 2.7 Deployment — Streamlit Prediction App
+
+The trained XGBoost model and label encoders are persisted via `joblib` and loaded at runtime by `app.py`, a Streamlit web application that enables real-time, single-applicant credit risk scoring.
+
+#### Running the App Locally
 
 ```bash
+# 1. Clone the repo
+git clone <repo-url>
+cd "Credit Risk Modeling with ML"
+
+# 2. Create and activate a virtual environment
 python -m venv .venv
-.venv\Scripts\activate  # Windows PowerShell
-pip install --upgrade pip
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS/Linux
+
+# 3. Install dependencies
 pip install pandas numpy matplotlib seaborn scikit-learn xgboost joblib streamlit
+
+# 4. Generate model artifacts (if not present)
+jupyter notebook "EDA and Modeling.ipynb"
+# Uncomment the joblib.dump() lines and run all cells
+
+# 5. Launch the app
+streamlit run app.py
+# Navigate to http://localhost:8501
 ```
 
-If you use `conda`, create an environment with similar packages and versions.
+#### App Inputs & Output
+
+| Input | Type | Range / Options |
+|---|---|---|
+| Age | Numeric | 18–80 |
+| Sex | Dropdown | male, female |
+| Job | Numeric | 0–3 (skill level) |
+| Housing | Dropdown | own, rent, free |
+| Saving accounts | Dropdown | little, moderate, rich, quite rich |
+| Checking account | Dropdown | little, moderate, rich |
+| Credit amount | Numeric | €0+ |
+| Duration | Numeric | 1–72 months |
+
+The app encodes categorical inputs using stored label encoders, constructs a single-row `DataFrame` matching the training feature schema, and returns either a **Good** or **Bad** credit risk prediction.
 
 ---
 
-### EDA and Model Training
+## 3. Repository Structure
 
-The **`EDA and Modeling.ipynb`** notebook walks through:
+```
+Credit Risk Modeling with ML/
+├── EDA and Modeling.ipynb      # Full analysis and model training notebook
+├── app.py                      # Streamlit prediction app
+├── german_credit_data.csv      # Source dataset (Kaggle German Credit Risk)
+├── xgb_credit_model.pkl        # Trained XGBoost model (generated by notebook)
+├── Sex_encoder.pkl             # Label encoder artifacts (generated by notebook)
+├── Housing_encoder.pkl
+├── Saving accounts_encoder.pkl
+├── Checking account_encoder.pkl
+├── target_encoder.pkl
+└── images/                     # EDA and modeling visualizations
+    ├── Risk distributions.png
+    ├── general feature distributions.png
+    ├── Credit amount distributions.png
+    ├── variables by risk level.png
+    ├── Heatamp for correlation.png
+    └── Credit vs Age.png
+```
 
-- **Loading and inspecting** `german_credit_data.csv`
-- **EDA**: distributions, correlations, class balance
-- **Preprocessing**:
-  - Handling missing values
-  - Encoding categorical variables (e.g. `Sex`, `Housing`, `Saving accounts`, `Checking account`) using label encoders
-  - Scaling or transforming numerical features as needed
-- **Modeling**:
-  - Training a classification model to predict credit risk
-  - Evaluating performance with metrics such as accuracy, confusion matrix, ROC‑AUC, etc.
-- **Model persistence**:
-  - Saving the trained model as `xgb_credit_model.pkl`
-  - Saving label encoders as separate `*.pkl` files (one per categorical column)
-
-To run the notebook:
-
-1. Make sure you have the environment set up and `german_credit_data.csv` in the project root.
-2. Start Jupyter (or VS Code / another notebook environment) from the project root:
-
-   ```bash
-   jupyter notebook
-   ```
-
-3. Open **`EDA and Modeling.ipynb`** and run all cells.
-4. Confirm that the following files are created in the project root:
-   - `xgb_credit_model.pkl`
-   - `Sex_encoder.pkl`
-   - `Housing_encoder.pkl`
-   - `Saving accounts_encoder.pkl`
-   - `Checking account_encoder.pkl`
-
-These artifacts are what the Streamlit app uses for inference.
+> **Note:** The `.pkl` model and encoder files are not committed to the repository. Run all cells in `EDA and Modeling.ipynb` (uncommenting the `joblib.dump()` lines) to regenerate them before launching the app.
 
 ---
 
-### Key Code Snippets
+## 4. Quick Start
 
-- **Load and preview the data**:
+**Prerequisites:** Python 3.8+, pip
 
-```python
-import pandas as pd
-
-df = pd.read_csv("german_credit_data.csv")
-print(df.info())
-df.head()
+```bash
+pip install pandas numpy matplotlib seaborn scikit-learn xgboost joblib streamlit jupyter
 ```
 
-- **Basic numerical EDA (example for `Age`)**:
-
-```python
-df["Age"].describe()
+**Run the notebook:**
+```bash
+jupyter notebook "EDA and Modeling.ipynb"
 ```
 
-- **Handle missing values and encode categorical features** (pattern similar to):
-
-```python
-from sklearn.preprocessing import LabelEncoder
-import joblib
-
-cat_cols = ["Sex", "Housing", "Saving accounts", "Checking account"]
-encoders = {}
-
-for col in cat_cols:
-    le = LabelEncoder()
-    df[col] = df[col].fillna("missing")
-    df[col] = le.fit_transform(df[col])
-    encoders[col] = le
-    joblib.dump(le, f"{col}_encoder.pkl")
-```
-
-- **Train and save the model** (example with XGBoost/sklearn API):
-
-```python
-from xgboost import XGBClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-import joblib
-
-X = df[["Age", "Sex", "Job", "Housing", "Saving accounts",
-        "Checking account", "Credit amount", "Duration"]]
-y = (df["Risk"] == "good").astype(int)  # 1 = good, 0 = bad
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
-)
-
-model = XGBClassifier(random_state=42)
-model.fit(X_train, y_train)
-
-y_pred = model.predict(X_test)
-print("Accuracy:", accuracy_score(y_test, y_pred))
-print(confusion_matrix(y_test, y_pred))
-print(classification_report(y_test, y_pred))
-
-joblib.dump(model, "xgb_credit_model.pkl")
+**Run the app:**
+```bash
+streamlit run app.py
 ```
 
 ---
 
-### EDA Visualizations (Highlights)
+## 5. Reproducibility & Extensions
 
-The notebook includes a variety of visual analyses built with `matplotlib` and `seaborn`. Some representative examples:
+**Reproducibility:**  
+Set `random_state=42` is used consistently across train/test splits and all sklearn-based models. XGBoost uses `random_state=1`. Re-running the notebook will produce identical results.
 
-- **Distributions of numerical features** (Age, Credit amount, Duration, etc.):
+**Potential Extensions:**
 
-```python
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-num_cols = ["Age", "Credit amount", "Duration"]
-plt.figure(figsize=(12, 4 * len(num_cols)))
-
-for i, col in enumerate(num_cols):
-    plt.subplot(len(num_cols), 1, i + 1)
-    sns.histplot(df[col], kde=True)
-    plt.title(f"Distribution of {col}")
-
-plt.tight_layout()
-plt.show()
-```
-
-- **Boxplots to inspect outliers in numeric features**:
-
-```python
-plt.figure(figsize=(12, 4))
-
-for i, col in enumerate(num_cols):
-    plt.subplot(1, len(num_cols), i + 1)
-    sns.boxplot(y=df[col], color="skyblue")
-    plt.title(col)
-
-plt.tight_layout()
-plt.show()
-```
-
-- **Categorical variables by risk level** (clear view of how categories split into Good vs Bad):
-
-```python
-cat_cols = ["Sex", "Housing", "Saving accounts",
-            "Checking account", "Job", "Purpose"]
-
-plt.figure(figsize=(15, 10))
-
-for i, col in enumerate(cat_cols):
-    plt.subplot(3, 3, i + 1)
-    sns.countplot(data=df, x=col, hue="Risk")
-    plt.title(f"{col} by Risk level")
-    plt.xlabel(col)
-    plt.ylabel("Count")
-    plt.xticks(rotation=45)
-
-plt.tight_layout()
-plt.show()
-```
-
-This visualization lets you quickly see, for example, how the proportion of **Good** vs **Bad** credit risks changes across categories such as `Housing` type, `Saving accounts` level, or `Checking account` status.
-
-- **Correlation heatmap for numerical features**:
-
-```python
-num_df = df[["Age", "Job", "Credit amount", "Duration"]]
-corr = num_df.corr()
-
-plt.figure(figsize=(6, 4))
-sns.heatmap(corr, annot=True, cmap="coolwarm", fmt=".2f")
-plt.title("Correlation Heatmap (Numerical Features)")
-plt.show()
-```
-
-- **Example relationship plots** (e.g., Credit amount vs Age, colored by Sex or sized by Duration):
-
-```python
-plt.figure(figsize=(8, 6))
-sns.scatterplot(
-    data=df,
-    x="Age",
-    y="Credit amount",
-    hue="Sex",
-    size="Duration",
-    alpha=0.7
-)
-plt.title("Credit amount vs Age (colored by Sex, sized by Duration)")
-plt.show()
-```
-
-> **Tip**: You can export any of these figures from the notebook as `.png` files (e.g., `plt.savefig("age_distribution.png")`) and embed them directly in this README if you want visual previews in the repository.
+- **Imputation strategies:** Replace listwise deletion with median/mode imputation or a `IterativeImputer` to retain the full 1,000-row dataset and evaluate the impact on model performance.
+- **Feature engineering:** Add interaction terms (e.g., `credit_amount / duration` as a monthly repayment proxy), bin `Age` into risk tiers, or encode `Purpose` with target encoding.
+- **Advanced calibration:** Apply Platt scaling or isotonic regression to convert raw XGBoost scores into well-calibrated default probabilities suitable for Expected Loss calculations (EL = PD × LGD × EAD).
+- **Threshold optimization:** Move beyond accuracy; optimize the decision threshold using a business cost matrix (false negative cost >> false positive cost in credit risk).
+- **SHAP explainability:** Add `shap.TreeExplainer` for per-prediction feature attribution — a regulatory requirement for model risk management in many jurisdictions.
+- **Containerization:** Dockerize `app.py` for cloud deployment (Streamlit Cloud, AWS ECS, Azure Container Apps).
 
 ---
 
-### Streamlit App: Credit Risk Prediction
+## 6. License & Acknowledgements
 
-The **Streamlit app** in `app.py` provides a simple web UI to make predictions using the trained model.
-
-#### Inputs
-
-The app collects:
-
-- `Age` (18–80)
-- `Sex` (`male`, `female`)
-- `Job` (integer 0–3)
-- `Housing` (`own`, `rent`, `free`)
-- `Saving accounts` (`little`, `moderate`, `rich`, `quite rich`)
-- `Checking account` (`little`, `moderate`, `rich`)
-- `Credit amount`
-- `Duration` (months)
-
-Categorical inputs are transformed via the stored label encoders so they match the representation used during training.
-
-#### Output
-
-When you click **“Predict Risk”**, the app:
-
-1. Builds a single‑row `pandas.DataFrame` with the encoded features.
-2. Passes it to the loaded model (`xgb_credit_model.pkl`).
-3. Displays the predicted credit risk:
-   - **Good** (success message) if the model predicts `1`.
-   - **Bad** (error message) if the model predicts `0`.
-
-Core prediction logic in `app.py` (simplified):
-
-```python
-import streamlit as st
-import pandas as pd
-import joblib
-
-model = joblib.load("xgb_credit_model.pkl")
-encoder = {
-    col: joblib.load(f"{col}_encoder.pkl")
-    for col in ["Sex", "Housing", "Saving accounts", "Checking account"]
-}
-
-age = st.number_input("Age", min_value=18, max_value=80, value=30)
-sex = st.selectbox("Sex", ["male", "female"])
-job = st.number_input("Job (0-3)", min_value=0, max_value=3, value=1)
-housing = st.selectbox("Housing", ["own", "rent", "free"])
-saving_account = st.selectbox(
-    "Saving accounts", ["little", "moderate", "rich", "quite rich"]
-)
-checking_account = st.selectbox(
-    "Checking account", ["little", "moderate", "rich"]
-)
-credit_amount = st.number_input("Credit Amount", min_value=0, value=1000)
-duration = st.number_input("Duration (months)", min_value=1, value=12)
-
-input_df = pd.DataFrame(
-    {
-        "Age": [age],
-        "Sex": [encoder["Sex"].transform([sex])[0]],
-        "Job": [job],
-        "Housing": [encoder["Housing"].transform([housing])[0]],
-        "Saving accounts": [
-            encoder["Saving accounts"].transform([saving_account])[0]
-        ],
-        "Checking account": [
-            encoder["Checking account"].transform([checking_account])[0]
-        ],
-        "Credit amount": [credit_amount],
-        "Duration": [duration],
-    }
-)
-
-if st.button("Predict Risk"):
-    pred = model.predict(input_df)[0]
-    if pred == 1:
-        st.success("The predicted credit risk is: **Good**")
-    else:
-        st.error("The predicted credit risk is: **Bad**")
-```
-
----
-
-### How to Run the App Locally
-
-1. **Clone or download** this repository and navigate into the project directory:
-
-   ```bash
-   cd "Credit Risk Modeling with ML"
-   ```
-
-2. **Create and activate** your virtual environment (see the Environment & Requirements section) and install the required packages.
-
-3. **Make sure model artifacts exist** in the project root:
-   - `xgb_credit_model.pkl`
-   - `Sex_encoder.pkl`
-   - `Housing_encoder.pkl`
-   - `Saving accounts_encoder.pkl`
-   - `Checking account_encoder.pkl`
-
-   If they are missing, open and run `EDA and Modeling.ipynb` to retrain and save them.
-
-4. **Launch the Streamlit app** from the project root:
-
-   ```bash
-   streamlit run app.py
-   ```
-
-5. A browser window should open automatically (or you can navigate to the URL shown in the terminal, typically `http://localhost:8501`) to interact with the credit risk prediction UI.
-
----
-
-### Reproducibility & Experimentation
-
-- **Random seeds**: If you care about exact reproducibility of model results, set random seeds in the notebook for libraries like NumPy, scikit‑learn, and XGBoost.
-- **Hyperparameters**: You can modify hyperparameters (e.g. learning rate, depth, regularization) in the notebook to experiment with performance–complexity trade‑offs.
-- **Feature engineering**: Try alternative encodings, binning of continuous variables, or additional domain‑specific features to improve model quality.
-
----
-
-### Potential Extensions
-
-Some ideas to extend this project:
-
-- **Model comparison**: Benchmark logistic regression, random forests, gradient boosting, and XGBoost.
-- **Calibration**: Explore probability calibration (Platt scaling, isotonic regression) for better risk scores.
-- **Explainability**: Add SHAP or feature importance plots to explain why a prediction is “Good” or “Bad”.
-- **Validation**: Use cross‑validation, time‑based splits (if applicable), and robust evaluation metrics.
-- **Deployment**: Containerize the app with Docker or deploy to a cloud platform (e.g. Streamlit Cloud, Heroku alternatives, etc.).
-
----
-
-### License & Acknowledgements
-
-- The **German Credit Data** dataset is widely used for educational and research purposes; please check its original source for licensing and citation details.
-- This project is intended for **learning and demonstration** only and should not be used as a production‑grade credit decision system.
-
+- **Dataset:** German Credit Risk data, originally sourced from the UCI Machine Learning Repository and available on Kaggle. Please refer to the original source for licensing and citation requirements.
+- **Project:** Developed by **Brandon Ytuarte / BMY Analytics** for portfolio demonstration purposes. Not intended as a production credit decision system.
+- This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
