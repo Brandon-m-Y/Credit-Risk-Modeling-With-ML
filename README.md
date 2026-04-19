@@ -261,8 +261,6 @@ plt.title("Credit amount vs Age (colored by Sex, sized by Duration)")
 plt.show()
 ```
 
-> **Tip**: You can export any of these figures from the notebook as `.png` files (e.g., `plt.savefig("age_distribution.png")`) and embed them directly in this README if you want visual previews in the repository.
-
 ---
 
 ### Streamlit App: Credit Risk Prediction
